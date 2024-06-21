@@ -15,7 +15,7 @@ app.use(express.json());
 // import routes from todo api 
 const todoRoutes = require("./routes/todos");
 
-app.use("api/v1/",todoRoutes);
+app.use("/api/v1/",todoRoutes);
 
 // db connect
 const dbConnect = require('./config/dbConnection');
