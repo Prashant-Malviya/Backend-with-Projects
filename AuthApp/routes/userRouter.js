@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const {signup, login} = require("../controllers/authController");
+const { auth, isStudent, isAdmin } = require('../middlewares/authMiddleware');
 
 router.post("/login",login);
 router.post('/signup',signup);
@@ -9,7 +10,7 @@ router.post('/signup',signup);
 router.get("/test",auth,(req,res)=>{
     res.json({
         success:true,
-        message:"welcome to test route"
+        message:"welcome to protected route, test route"
     })
 })
 
