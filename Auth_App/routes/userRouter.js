@@ -10,6 +10,7 @@ router.post("/login",login);
 
 router.post("/signup",signup);
 
+
 // protected router
 
 router.get("/test",auth, (req,res)=>{

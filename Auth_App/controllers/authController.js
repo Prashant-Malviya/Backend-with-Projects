@@ -92,7 +92,7 @@ exports.login = async (req, res) => {
       user.token = token;
       user.password = undefined
       
-      console.log(user,'user');
+      // console.log(user,'user'); 
       
 
       const options = {
