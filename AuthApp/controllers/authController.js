@@ -1,36 +1,34 @@
 const bcrypt = require("bcrypt");
-const User = require("../models/userModel");
 const jwt = require("jsonwebtoken");
+const User = require("../models/userModel");
 require("dotenv").config();
 
-// signup route handler
+// Signup route handler
 exports.signup = async (req, res) => {
   try {
-    //get data
     const { name, email, password, role } = req.body;
 
-    // check if user already exist
-    const existingUser = await User.findOne({ email });
-
-    if (existingUser) {
+    // Validate required fields
+    if (!name || !email || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: "user already exists",
+        message: "Please provide all required details (name, email, password, role).",
       });
     }
 
-    //secure password
-    let hashedPassword;
-    try {
-      hashedPassword = await bcrypt.hash(password, 10);
-    } catch (error) {
-      return res.status(500).json({
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({
         success: false,
-        message: "Error in hashing password",
+        message: "User already exists. Please log in.",
       });
     }
 
-    //create entry for user
+    // Secure password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new user
     const user = await User.create({
       name,
       email,
@@ -38,83 +36,82 @@ exports.signup = async (req, res) => {
       role,
     });
 
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
-      message: "User Created Successfully",
+      message: "User registered successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error during signup:", error);
     return res.status(500).json({
       success: false,
-      message: "user can't be register please try again later",
+      message: "Internal server error. Please try again later.",
     });
   }
 };
 
-//login
-
+// Login route handler
 exports.login = async (req, res) => {
   try {
-    //data fetch
     const { email, password } = req.body;
 
-    // validation on email and password
+    // Validate input fields
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Please fill all the details carefully",
+        message: "Please provide both email and password.",
       });
     }
 
-    // check for registered user
-    let user = await User.findOne({ email });
-
-    // if not a registered user
-
+    // Find user by email
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({
+      return res.status(404).json({
         success: false,
-        message: "User is not registered",
+        message: "User not found. Please register first.",
       });
     }
 
-    const payload = {
-      email: user.email,
-      id: user._id,
-      role: user.role,
-    };
-    //verify password & generate a JWT Token
-    if (await bcrypt.compare(password, user.password)) {
-      //password match
-      let token = jwt.sign(payload, process.env.JWT_SECRET, {
-        expiresIn: "2h",
-      });
-
-      user = user.toObject();
-      user.token = token;
-      user.password = undefined;
-      const options = {
-        expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-        httpOnly: true,
-      };
-      res.cookie("prashantCookie", token, options).status(200).json({
-        success: true,
-        token,
-        user,
-        message: "User logged in successfully",
-      });
-    } else {
-      // password does not match
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       return res.status(403).json({
         success: false,
-        message: "Password Incorrect",
+        message: "Invalid password. Please try again.",
       });
     }
+
+    // Generate JWT token
+    const payload = { id: user._id, email: user.email, role: user.role };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
+
+    // Set the token in an HTTP-only cookie for security
+    const cookieOptions = {
+      expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
+      httpOnly: true, // Prevent access to cookie via client-side JavaScript
+      secure: process.env.NODE_ENV === "production", // Secure in production
+    };
+    res.cookie("authToken", token, cookieOptions);
+
+    // Omit password from the response
+    const userResponse = { ...user.toObject(), password: undefined };
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged in successfully",
+      token,
+      user: userResponse,
+    });
   } catch (error) {
-    console.log(error);
+    console.error("Error during login:", error);
     return res.status(500).json({
       success: false,
-      message: "login failure",
+      message: "Login failed. Please try again later.",
     });
   }
 };
